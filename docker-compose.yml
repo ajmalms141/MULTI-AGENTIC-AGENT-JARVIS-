@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+
+  # ─────────────────────────────────────────
+  # REDIS — Cache for price compare results
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: jarvis_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # ORCHESTRATOR — Intent router + audit log
+  # ─────────────────────────────────────────
+  orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    container_name: jarvis_orchestrator
+    ports:
+      - "${ORCHESTRATOR_PORT:-8000}:8000"
+    env_file: .env
+    volumes:
+      - sqlite_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # PRESENTATION — Gemini + python-pptx
+  # ─────────────────────────────────────────
+  presentation:
+    build:
+      context: ./presentation
+      dockerfile: Dockerfile
+    container_name: jarvis_presentation
+    ports:
+      - "${PRESENTATION_PORT:-8001}:8001"
+    env_file: .env
+    volumes:
+      - output_data:/output
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # PRICE COMPARE — Playwright scrapers
+  # ─────────────────────────────────────────
+  price_compare:
+    build:
+      context: ./price_compare
+      dockerfile: Dockerfile
+    container_name: jarvis_price_compare
+    ports:
+      - "${PRICE_COMPARE_PORT:-8002}:8002"
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # EMAIL SERVICE — Gmail SMTP
+  # ─────────────────────────────────────────
+  email_service:
+    build:
+      context: ./email_service
+      dockerfile: Dockerfile
+    container_name: jarvis_email
+    ports:
+      - "${EMAIL_SERVICE_PORT:-8003}:8003"
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # N8N — Visual workflow engine
+  # ─────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: jarvis_n8n
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - WEBHOOK_URL=http://localhost:5678
+      - GENERIC_TIMEZONE=Asia/Kolkata
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n_workflows:/workflows
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # FRONTEND — React + Vite
+  # ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: jarvis_frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - VITE_ORCHESTRATOR_URL=http://localhost:8000
+      - VITE_PRESENTATION_URL=http://localhost:8001
+      - VITE_PRICE_URL=http://localhost:8002
+      - VITE_EMAIL_URL=http://localhost:8003
+    depends_on:
+      - orchestrator
+    restart: unless-stopped
+
+# ─────────────────────────────────────────
+# VOLUMES
+# ─────────────────────────────────────────
+volumes:
+  redis_data:
+  sqlite_data:
+  output_data:
+  n8n_data:

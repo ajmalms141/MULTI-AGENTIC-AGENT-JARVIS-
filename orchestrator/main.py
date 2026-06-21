@@ -255,12 +255,13 @@ async def command(body: dict):
             instruction = intent_data.get("email_instruction", "Review the generated data.")
             steps.append(f"Drafting email to: '{recipient or 'Unspecified'}'.")
             
-            # Compose email body using Gemini
+            # Compose email body and subject using Gemini
             email_prompt_system = (
-                "You are an email assistant. Write a professional, polite, and comprehensive business email body "
-                "in HTML format. Highlight search results, prices, slide presentation names, or other details if provided. "
-                "Wrap your email content nicely with HTML tags (p, ul, li, strong, etc.) so it displays beautifully. "
-                "Do not write full html/head/body documents, just paragraphs and list items. Keep it professional."
+                "You are an email assistant. Write a professional, polite, and comprehensive business email. "
+                "Highlight search results, prices, slide presentation names, or other details if provided. "
+                "You must return a JSON object with two keys: 'subject' (a concise, professional subject line) "
+                "and 'body' (the email body wrapped nicely with HTML tags like p, ul, li, strong, etc. so it displays beautifully. "
+                "Do not write full html/head/body documents, just paragraphs and list items). Keep it professional."
             )
             
             email_context = f"Instruction: {instruction}\n"
@@ -272,11 +273,14 @@ async def command(body: dict):
                 email_context += f"Presentation Topic: {presentation_results.get('topic')}\nPresentation File: {presentation_results.get('filename')}\n"
                 
             try:
-                subject = f"JARVIS Report: {intent_data.get('price_query') or intent_data.get('presentation_topic') or 'Automated Update'}"
                 try:
-                    email_body = await call_gemini(email_prompt_system, email_context)
+                    raw_email_response = await call_gemini(email_prompt_system, email_context, json_mode=True)
+                    email_data = json.loads(raw_email_response.strip())
+                    subject = email_data.get("subject", "Automated Update")
+                    email_body = email_data.get("body", "<p>Error generating body.</p>")
                 except Exception as gem_err:
                     steps.append(f"Failed to compose email via Gemini ({str(gem_err)}). Using fallback template.")
+                    subject = f"JARVIS Report: {intent_data.get('price_query') or intent_data.get('presentation_topic') or 'Automated Update'}"
                     # Build custom HTML fallback body
                     email_body = f"<p>Hello,</p><p>Here is your requested update from JARVIS:</p><ul>"
                     if price_results:

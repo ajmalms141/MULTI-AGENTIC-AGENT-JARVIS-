@@ -27,7 +27,7 @@
   width: 36px;
   height: 36px;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
-  border-radius: 8px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -74,7 +74,7 @@
   border: 1px solid var(--panel-border);
   color: #fff;
   padding: 8px 16px;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s;
@@ -127,7 +127,7 @@
   min-height: 100px;
   background: rgba(8, 12, 20, 0.5);
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
+  border-radius: 4px;
   padding: 16px;
   color: #fff;
   font-family: inherit;
@@ -143,32 +143,97 @@
   box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
 }
 
+.input-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .submit-btn {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: #fff;
   border: none;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 8px 20px;
+  border-radius: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  transition: transform 0.2s, opacity 0.2s;
+  font-weight: 600;
+  box-shadow: 0 4px 12px var(--primary-glow);
+  transition: all 0.2s ease-in-out;
 }
 
 .submit-btn:hover {
   transform: translateY(-1px);
+  box-shadow: 0 6px 15px var(--primary);
 }
 
 .submit-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+}
+
+.voice-input-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  color: var(--primary);
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+}
+
+.voice-input-btn:hover {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.voice-input-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voice-input-btn.listening {
+  background: rgba(255, 0, 85, 0.2);
+  border-color: var(--danger);
+  color: var(--danger);
+  box-shadow: 0 0 12px var(--danger-glow);
+}
+
+.hud-config-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+}
+
+.hud-config-btn:hover {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.hud-config-btn.active {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: rgba(0, 240, 255, 0.05);
 }
 
 .helpers-list {
@@ -286,7 +351,7 @@
   gap: 8px;
   padding: 6px;
   background: rgba(8, 12, 20, 0.4);
-  border-radius: 12px;
+  border-radius: 4px;
   margin-bottom: 20px;
   border: 1px solid var(--panel-border);
 }
@@ -294,7 +359,7 @@
 .tab-btn {
   flex: 1;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 4px;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -771,4 +836,97 @@
 .audit-badge.unknown {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-muted);
+}
+
+/* Delivery Options Layout */
+.delivery-sections-container {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  margin-top: 24px;
+}
+
+.delivery-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.delivery-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+
+.delivery-section-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.delivery-section-header .icon {
+  font-size: 20px;
+}
+
+.delivery-section-header .badge-count {
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  padding: 2px 8px;
+  border-radius: 99px;
+  margin-left: auto;
+}
+
+.no-delivery-options {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--panel-border);
+  color: var(--text-muted);
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.delivery-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  z-index: 2;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.delivery-badge.instant {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+}
+
+.delivery-badge.scheduled {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #fff;
+}
+
+.product-image-container {
+  position: relative; /* to position the absolute delivery-badge */
+}
+
+.instant-delivery-card {
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.instant-delivery-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 32px 0 rgba(16, 185, 129, 0.08);
+}
+
+.instant-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
 }

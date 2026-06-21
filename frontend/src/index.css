@@ -1,42 +1,87 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
 
 :root {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Space Grotesk', sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: dark;
-  color: #e2e8f0;
-  background-color: #080c14;
+  color: #c8d6e5;
+  background-color: #030712;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Global Colors */
-  --bg-gradient: linear-gradient(135deg, #080c14 0%, #0f172a 100%);
-  --panel-bg: rgba(15, 23, 42, 0.6);
-  --panel-border: rgba(255, 255, 255, 0.06);
-  --panel-border-hover: rgba(59, 130, 246, 0.3);
+  /* Futuristic Cyberpunk HUD Colors */
+  --bg-dark: #030712;
+  --bg-gradient: radial-gradient(circle at center, #0f172a 0%, #030712 100%);
+  --panel-bg: rgba(15, 23, 42, 0.4);
+  --panel-border: rgba(0, 240, 255, 0.15);
+  --panel-border-hover: rgba(0, 240, 255, 0.5);
   
-  --primary: #3b82f6; /* Neon Blue */
-  --primary-glow: rgba(59, 130, 246, 0.4);
-  --secondary: #8b5cf6; /* Neon Purple */
-  --secondary-glow: rgba(139, 92, 246, 0.4);
-  --accent: #10b981; /* Emerald Green */
-  --accent-glow: rgba(16, 185, 129, 0.4);
-  --danger: #ef4444;
-  --text-muted: #94a3b8;
-  --text-main: #f8fafc;
+  --primary: #00f0ff; /* Hologram Cyan */
+  --primary-glow: rgba(0, 240, 255, 0.3);
+  --secondary: #8b5cf6; /* Cyber Purple */
+  --secondary-glow: rgba(139, 92, 246, 0.3);
+  --accent: #00ff66; /* Neon Green */
+  --accent-glow: rgba(0, 255, 102, 0.3);
+  --warning: #fbbf24;
+  --danger: #ff0055; /* Warning Red */
+  --danger-glow: rgba(255, 0, 85, 0.3);
+  --text-muted: #64748b;
+  --text-main: #e2e8f0;
+}
+
+h1, h2, h3, h4, h5, h6, .tech-mono {
+  font-family: 'Rajdhani', sans-serif !important;
+  letter-spacing: 1.5px;
 }
 
 body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: var(--bg-gradient);
+  background: var(--bg-dark);
+  background-image: var(--bg-gradient);
   overflow-x: hidden;
+  position: relative;
+}
+
+/* Starry Scanline Cyber Grid Background Overlay */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    linear-gradient(rgba(18, 24, 38, 0.2) 50%, transparent 50%),
+    linear-gradient(90deg, rgba(18, 24, 38, 0.2) 50%, transparent 50%);
+  background-size: 4px 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(rgba(0, 240, 255, 0.03) 50%, transparent 50%);
+  background-size: 100% 4px;
+  animation: scanlines 10s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes scanlines {
+  from { background-position: 0 0; }
+  to { background-position: 0 100%; }
 }
 
 /* Premium Scrollbars */
@@ -45,56 +90,108 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(8, 12, 20, 0.3);
+  background: rgba(3, 7, 18, 0.8);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: rgba(0, 240, 255, 0.2);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
+  box-shadow: 0 0 10px var(--primary-glow);
 }
 
-/* Glassmorphic Panel Utility */
+/* Cinematic Jarvis Tech Panels with Corner Brackets */
 .glass-panel {
   background: var(--panel-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--panel-border);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 4px; /* sharp HUD aesthetic */
+  position: relative;
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.5);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.glass-panel::before,
+.glass-panel::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--primary);
+  pointer-events: none;
+  transition: all 0.3s;
+}
+
+/* Top-left corner bracket */
+.glass-panel::before {
+  top: -1px;
+  left: -1px;
+  border-right: none;
+  border-bottom: none;
+}
+
+/* Bottom-right corner bracket */
+.glass-panel::after {
+  bottom: -1px;
+  right: -1px;
+  border-left: none;
+  border-top: none;
+}
+
 .glass-panel:hover {
   border-color: var(--panel-border-hover);
-  box-shadow: 0 8px 32px 0 rgba(59, 130, 246, 0.08);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+  background: rgba(15, 23, 42, 0.6);
 }
 
-/* Floating Animation */
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-6px); }
-  100% { transform: translateY(0px); }
+.glass-panel:hover::before,
+.glass-panel:hover::after {
+  width: 14px;
+  height: 14px;
+  border-color: #ffffff;
+  filter: drop-shadow(0 0 4px var(--primary));
 }
 
-.floating {
-  animation: float 4s ease-in-out infinite;
+/* Monospace font for digital readout numbers/meta */
+.tech-mono {
+  font-family: 'Fira Code', monospace !important;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
-/* Shimmer/Pulse glow for status updates */
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.6; box-shadow: 0 0 10px var(--primary-glow); }
-  50% { opacity: 1; box-shadow: 0 0 20px var(--primary); }
+/* Pulse/glow animations for HUD components */
+@keyframes hud-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--primary-glow)); }
+  50% { filter: drop-shadow(0 0 8px var(--primary)); }
 }
-.status-active {
-  animation: pulse-glow 2s infinite;
+
+.hud-pulse {
+  animation: hud-glow 4s ease-in-out infinite;
 }
 
 /* List Item Slide-in Animation */
 @keyframes slide-in {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-slide-in {
-  animation: slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Keyframes for spinning Arc logo */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; filter: drop-shadow(0 0 3px var(--primary)); }
 }

@@ -1,0 +1,48 @@
+# Environment — NEVER commit real keys
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/build/
+.npm
+
+# Docker volumes
+n8n_data/
+redis_data/
+
+# Output files (generated PPTX, etc.)
+output/
+*.pptx
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# SQLite DB (runtime data)
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/

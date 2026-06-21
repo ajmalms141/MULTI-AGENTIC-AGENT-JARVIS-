@@ -46,3 +46,10 @@ desktop.ini
 # Logs
 *.log
 logs/
+
+# Other projects in this workspace (not part of Jarvis)
+BHARAT-ELECTION-ASSISTANT/
+bablu-ai/
+jisu-portfolio/
+portfolio/
+AI_ASSISTANT/

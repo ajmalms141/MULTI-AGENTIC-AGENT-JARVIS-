@@ -64,16 +64,18 @@ const speakWelcomeMessage = () => {
   try {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
-      const text = "Welcome to Antigravity. Jarvis core system is now active.";
+      const text = "Systems Ready lets Begin";
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.05;
+      utterance.rate = 0.92;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
       
       const voices = window.speechSynthesis.getVoices();
-      // Search for British female voices first to act as Friday, fallback to David or any en-US female
-      const cyberVoice = voices.find(v => v.name.includes('Google UK English Female') || v.name.includes('Hazel') || v.name.includes('Susan') || v.name.includes('Zira'))
-                         || voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('female'))
-                         || voices.find(v => v.lang.startsWith('en-US') && v.name.toLowerCase().includes('female') || v.name.includes('Zira'))
+      // Search for a Bold male voice or fallback to British/US male
+      const cyberVoice = voices.find(v => v.name.toLowerCase().includes('bold') && v.name.toLowerCase().includes('male'))
+                         || voices.find(v => v.name.includes('Google UK English Male') || v.name.includes('George') || v.name.includes('Arthur'))
+                         || voices.find(v => v.lang.startsWith('en-GB') && v.name.toLowerCase().includes('male'))
+                         || voices.find(v => v.lang.startsWith('en-US') && (v.name.toLowerCase().includes('male') || v.name.includes('David') || v.name.includes('Mark')))
                          || voices.find(v => v.lang.startsWith('en-GB'))
                          || voices[0];
       if (cyberVoice) {

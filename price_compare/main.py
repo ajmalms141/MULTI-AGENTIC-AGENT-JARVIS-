@@ -15,10 +15,10 @@ import re
 import redis
 import json
 import httpx
+import asyncio
 import urllib.parse
 import random
 from fastapi import HTTPException
-from playwright.async_api import async_playwright
 
 # Connect to Redis
 try:
@@ -83,7 +83,7 @@ async def call_gemini(system_prompt: str, user_prompt: str, json_mode: bool = Fa
         
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
     async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload, timeout=20.0)
+        response = await client.post(url, json=payload, timeout=40.0)
         if response.status_code != 200:
             raise ValueError(f"Gemini API Error: {response.text}")
         result = response.json()
@@ -253,64 +253,28 @@ def get_mock_results(query: str):
     products.sort(key=lambda x: parse_price(x["price"]))
     return products
 
-async def scrape_amazon(query: str):
-    results = []
+async def get_amazon_ai_results(query: str) -> list:
+    """Use AI to generate realistic Amazon.in listings since direct scraping is blocked by bot detection."""
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-            page = await context.new_page()
-            url = f"https://www.amazon.in/s?k={urllib.parse.quote(query)}"
-            
-            await page.goto(url, timeout=15000)
-            await page.wait_for_selector('[data-component-type="s-search-result"]', timeout=8000)
-            
-            items = await page.query_selector_all('[data-component-type="s-search-result"]')
-            for item in items[:5]:
-                # Title
-                title_el = await item.query_selector('h2 span')
-                if not title_el:
-                    title_el = await item.query_selector('h2')
-                title = await title_el.inner_text() if title_el else ""
-                
-                # Price
-                price_el = await item.query_selector('.a-price-whole')
-                price = await price_el.inner_text() if price_el else ""
-                
-                # Link
-                link_el = await item.query_selector('a.a-text-normal')
-                if not link_el:
-                    link_el = await item.query_selector('a.s-line-clamp-2')
-                link = await link_el.get_attribute('href') if link_el else ""
-                if link and not link.startswith('http'):
-                    link = "https://www.amazon.in" + link
-                    
-                # Image
-                img_el = await item.query_selector('img.s-image')
-                if not img_el:
-                    img_el = await item.query_selector('img')
-                img = await img_el.get_attribute('src') if img_el else ""
-                
-                # Rating
-                rating_el = await item.query_selector('.a-icon-alt')
-                rating = await rating_el.inner_text() if rating_el else ""
-                
-                if title and price:
-                    results.append({
-                        "title": title.strip(),
-                        "price": f"₹{price.strip()}",
-                        "link": link,
-                        "image": img,
-                        "rating": rating.split(' ')[0] if rating else "N/A",
-                        "source": "Amazon.in",
-                        "delivery_type": "scheduled"
-                    })
-            await browser.close()
+        system_prompt = (
+            "You are a price comparison assistant for Amazon.in (India). "
+            "Generate 2-3 realistic Amazon.in product listings for the user's query. "
+            "Return a JSON object with a 'results' key containing a list. Each item MUST have:\n"
+            "- 'title': A realistic product title (brand + model + specs)\n"
+            "- 'price': Price in INR format like '₹1,299'\n"
+            "- 'link': https://www.amazon.in/s?k={url-encoded-product-name}\n"
+            "- 'image': A relevant Unsplash image URL (https://images.unsplash.com/photo-XXXXX?w=400)\n"
+            "- 'rating': A rating string like '4.2'\n"
+            "- 'source': 'Amazon.in'\n"
+            "- 'delivery_type': 'scheduled'\n"
+            "Return ONLY valid JSON, no markdown."
+        )
+        raw = await call_gemini(system_prompt, f"Query: '{query}'", json_mode=True)
+        data = json.loads(raw.strip())
+        return data.get("results", [])
     except Exception as e:
-        print(f"Scraper encountered error (falling back to mock data): {e}")
-    return results
+        print(f"Amazon AI results failed: {e}")
+        return []
 
 @app.post("/search")
 async def search(body: dict):
@@ -335,43 +299,52 @@ async def search(body: dict):
         except Exception as e:
             print(f"Redis get error: {e}")
             
-    # Scraping & AI generation
-    print(f"Cache miss. Searching for: {search_query}")
+    # AI generation (no more Playwright scraping - Amazon blocks bots)
+    print(f"Cache miss. Fetching AI results for: {search_query}")
     
-    # Run the real scraper and AI-augmented parser
-    ai_results = await get_ai_augmented_results(f"{search_query} in {location}" if location else search_query)
-    scraped_results = await scrape_amazon(search_query)
+    full_query = f"{search_query} in {location}" if location else search_query
     
-    # Merge results
+    # Run both AI calls concurrently
+    ai_results, amazon_results = await asyncio.gather(
+        get_ai_augmented_results(full_query),
+        get_amazon_ai_results(search_query),
+        return_exceptions=True
+    )
+    
+    # Handle exceptions from gather
+    if isinstance(ai_results, Exception):
+        print(f"AI augmented results error: {ai_results}")
+        ai_results = []
+    if isinstance(amazon_results, Exception):
+        print(f"Amazon AI results error: {amazon_results}")
+        amazon_results = []
+    
     results = []
-    # Add real scraped results first
-    results.extend(scraped_results)
     
-    # Add AI results, filtering out any duplicate Amazon listings
-    scraped_sources = {r["source"].lower() for r in scraped_results}
-    if ai_results:
-        for item in ai_results:
-            source_lower = item.get("source", "").lower()
-            if source_lower in scraped_sources or "amazon" in source_lower:
-                continue
-            # Append location to title if parsed
-            if location and location.lower() not in item.get("title", "").lower():
-                item["title"] = f"{item['title']} (Delivered to {location.title()})"
-            results.append(item)
-    else:
-        # If Gemini fails, merge the mock results to guarantee we have Instant Delivery options (Blinkit, Instamart, Zepto)
-        print("Gemini API rate limited or failed. Merging mock results to ensure local instant options.")
-        mock_results = get_mock_results(query)
-        for item in mock_results:
-            source_lower = item.get("source", "").lower()
-            if source_lower in scraped_sources or "amazon" in source_lower:
-                continue
-            results.append(item)
+    # Add non-Amazon AI results first (Blinkit, Zepto, Instamart, Flipkart, etc.)
+    seen_sources = set()
+    for item in ai_results:
+        source_lower = item.get("source", "").lower()
+        # Skip Amazon duplicates from main AI call (we use dedicated amazon call)
+        if "amazon" in source_lower:
+            continue
+        if location and location.lower() not in item.get("title", "").lower():
+            item["title"] = f"{item['title']} (Delivered to {location.title()})"
+        results.append(item)
+        seen_sources.add(source_lower)
+    
+    # Add Amazon AI-generated listings
+    results.extend(amazon_results)
+    
+    # If both AI calls failed, fall back to mock data
+    if not results:
+        print("Both AI calls failed. Falling back to mock results.")
+        results = get_mock_results(query)
         
-    # Save to cache
+    # Save to cache (30 min TTL)
     if redis_client:
         try:
-            redis_client.setex(cache_key, 3600, json.dumps(results)) # Cache for 1 hour
+            redis_client.setex(cache_key, 1800, json.dumps(results))
         except Exception as e:
             print(f"Redis set error: {e}")
             

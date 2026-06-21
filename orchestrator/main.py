@@ -204,10 +204,10 @@ async def command(body: dict):
         intent = intent_data.get("intent", "unknown")
         steps.append(f"Routed using Rule-Based Fallback. Intent parsed: '{intent}'.")
         
-    # Define downstream URLs
-    PRICE_URL = os.environ.get("VITE_PRICE_URL", "http://jarvis_price_compare:8002")
-    PRESENTATION_URL = os.environ.get("VITE_PRESENTATION_URL", "http://jarvis_presentation:8001")
-    EMAIL_URL = os.environ.get("VITE_EMAIL_URL", "http://jarvis_email:8003")
+    # Define downstream URLs using internal Docker network hostnames
+    PRICE_URL = os.environ.get("PRICE_SERVICE_URL", "http://jarvis_price_compare:8002")
+    PRESENTATION_URL = os.environ.get("PRESENTATION_SERVICE_URL", "http://jarvis_presentation:8001")
+    EMAIL_URL = os.environ.get("EMAIL_SERVICE_URL", "http://jarvis_email:8003")
     
     price_results = None
     presentation_results = None

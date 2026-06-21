@@ -28,6 +28,53 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 def health():
     return {"status": "ok", "service": "presentation"}
 
+def get_gemini_keys() -> list:
+    """Collect all configured Gemini API keys (GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3, ...)."""
+    keys = []
+    # Always check base key
+    base = os.environ.get("GEMINI_API_KEY", "").strip()
+    if base:
+        keys.append(base)
+    # Check numbered extras
+    for i in range(2, 10):
+        extra = os.environ.get(f"GEMINI_API_KEY_{i}", "").strip()
+        if extra:
+            keys.append(extra)
+        else:
+            break
+    return keys
+
+async def call_gemini_with_rotation(payload: dict) -> dict:
+    """Try each Gemini API key in order, rotating on rate limit (429) or errors."""
+    keys = get_gemini_keys()
+    if not keys:
+        raise HTTPException(status_code=500, detail="No Gemini API key configured on server")
+    
+    last_error = None
+    for idx, key in enumerate(keys):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={key}"
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, timeout=40.0)
+            
+            if response.status_code == 200:
+                print(f"Gemini call succeeded with key #{idx + 1}")
+                return response.json()
+            elif response.status_code == 429:
+                print(f"Key #{idx + 1} rate limited (429), trying next key...")
+                last_error = f"Key #{idx + 1}: Rate limited (429)"
+                continue
+            else:
+                print(f"Key #{idx + 1} returned error {response.status_code}: {response.text[:200]}")
+                last_error = f"Key #{idx + 1}: HTTP {response.status_code}"
+                continue
+        except Exception as e:
+            print(f"Key #{idx + 1} request failed: {e}")
+            last_error = str(e)
+            continue
+    
+    raise HTTPException(status_code=503, detail=f"All Gemini API keys failed. Last error: {last_error}")
+
 @app.get("/download/{filename}")
 async def download_file(filename: str):
     file_path = os.path.join(OUTPUT_DIR, filename)
@@ -71,11 +118,11 @@ async def generate(body: dict):
     if not topic:
         raise HTTPException(status_code=400, detail="Topic is required")
         
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    if not gemini_key:
-        raise HTTPException(status_code=500, detail="Gemini API key is not configured on server")
+    # Validate at least one key is available
+    if not get_gemini_keys():
+        raise HTTPException(status_code=500, detail="No Gemini API key configured on server")
         
-    # Query Gemini to generate slide structure
+    # Query Gemini to generate slide structure (with automatic key rotation)
     system_prompt = (
         "You are an expert presentation designer. Create a highly informative presentation outline in JSON format. "
         "Each slide must contain a slide 'title', an array of 3-4 bullet 'points', and a visual 'image_query' keyword "
@@ -95,25 +142,21 @@ async def generate(body: dict):
     }
     
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, timeout=20.0)
-            if response.status_code != 200:
-                raise HTTPException(status_code=500, detail=f"Gemini API returned error: {response.text}")
-                
-            raw_response = response.json()
-            # Extract text from gemini response structure
-            content_text = raw_response["candidates"][0]["content"]["parts"][0]["text"]
-            
-            # Clean up the output string to ensure it's valid JSON
-            clean_json_str = content_text.strip()
-            if clean_json_str.startswith("```json"):
-                clean_json_str = clean_json_str.replace("```json", "", 1)
-            if clean_json_str.endswith("```"):
-                clean_json_str = clean_json_str[:-3]
-            clean_json_str = clean_json_str.strip()
-            
-            slides_data = json.loads(clean_json_str)
+        # call_gemini_with_rotation tries each key automatically on 429/error
+        raw_response = await call_gemini_with_rotation(payload)
+        content_text = raw_response["candidates"][0]["content"]["parts"][0]["text"]
+        
+        # Clean up the output string to ensure it's valid JSON
+        clean_json_str = content_text.strip()
+        if clean_json_str.startswith("```json"):
+            clean_json_str = clean_json_str.replace("```json", "", 1)
+        if clean_json_str.endswith("```"):
+            clean_json_str = clean_json_str[:-3]
+        clean_json_str = clean_json_str.strip()
+        
+        slides_data = json.loads(clean_json_str)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate content with Gemini: {str(e)}")
         

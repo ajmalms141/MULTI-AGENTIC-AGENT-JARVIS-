@@ -118,18 +118,32 @@ async def command(body: dict):
     system_prompt = (
         "You are the JARVIS Assistant Router. Analyze the user command and categorize the request. "
         "Extract these properties and return a clean JSON object:\n"
-        "- intent: one of 'price_compare', 'presentation', 'email_draft', 'price_compare_and_email', 'presentation_and_email', 'unknown'\n"
+        "- intent: one of 'price_compare', 'presentation', 'email_draft', 'price_compare_and_email', 'presentation_and_email', 'local_action', 'unknown'\n"
         "- price_query: product search keywords (if applicable, e.g. 'iPhone 15 Pro')\n"
         "- presentation_topic: clear slide topic title (if applicable)\n"
         "- slides_count: number of slides to generate (default to 5)\n"
         "- email_recipient: email address mentioned (if applicable)\n"
         "- email_instruction: what the email is about or custom details to include (if applicable)\n"
-        "Be accurate and only output JSON."
+        "- local_action_type: if intent is local_action, choose the BEST match from: "
+        "'play_spotify' (open spotify and play a song), "
+        "'open_whatsapp' (open whatsapp, optionally send a message), "
+        "'open_telegram' (open telegram, optionally message a user), "
+        "'open_instagram' (open instagram), "
+        "'open_app' (open any other app like chrome, notepad, calculator), "
+        "'read_screen' (take a screenshot and answer a question about what's on screen), "
+        "'open_and_read' (open an app AND then read/describe what's on screen), "
+        "'organize_files' (organize files in a folder)\n"
+        "- local_target: the song name / app name / folder path relevant to the action\n"
+        "- local_question: the specific question to answer about the screen (e.g. 'What is the first post in the feed?'). Use empty string if not applicable.\n"
+        "- local_message: the message text to send (for whatsapp/telegram). Use empty string '' if none.\n"
+        "- local_phone: phone number with country code for whatsapp (e.g. +919876543210). Use empty string '' if none.\n"
+        "- local_username: telegram username (without @) to message. Use empty string '' if none.\n"
+        "- local_rules: for organize_files only, array like [{'extension': ['.pdf'], 'destination': 'Documents'}]. Use [] if not applicable.\n"
+        "Be accurate and only output valid JSON with no extra explanation."
     )
     
     import re
     
-    # Define rule-based fallback parser
     def rule_based_fallback_parser(text: str) -> dict:
         text_lower = text.lower()
         intent = "unknown"
@@ -138,7 +152,57 @@ async def command(body: dict):
         slides_count = 5
         email_recipient = ""
         email_instruction = "Review the generated data."
+        local_action_type = ""
+        local_target = ""
+        local_rules = []
+        # Check for Local Actions - order matters: check specific apps first
         
+        # 1. Read Screen / Open & Read logic
+        has_read_cues = any(kw in text_lower for kw in ["what is", "tell me", "read", "what do you see", "analyze", "what's"])
+        has_open_cues = any(kw in text_lower for kw in ["open", "launch", "start"])
+        
+        if has_read_cues:
+            if has_open_cues and " and " in text_lower:
+                intent = "local_action"
+                local_action_type = "open_and_read"
+                app_match = re.search(r'(?:open|launch|start)\s+(\w+)', text, re.IGNORECASE)
+                local_target = app_match.group(1).lower() if app_match else "screen"
+                local_question = re.sub(r'.*(?:and\s+)(what is|tell me|read|analyze|what\'s).*', r'\1', text, flags=re.IGNORECASE)
+            else:
+                intent = "local_action"
+                local_action_type = "read_screen"
+                local_target = text
+                local_question = text
+                
+        # 2. Specific App triggers
+        elif "spotify" in text_lower or "play song" in text_lower or "play music" in text_lower:
+            intent = "local_action"
+            local_action_type = "play_spotify"
+            song_match = re.search(r'(?:play|search for)\s+(.*?)(?:\s+on spotify|\s+in spotify|$)', text, re.IGNORECASE)
+            local_target = song_match.group(1).strip() if song_match else re.sub(r'open spotify( and play)?', '', text, flags=re.IGNORECASE).strip()
+        elif "whatsapp" in text_lower:
+            intent = "local_action"
+            local_action_type = "open_whatsapp"
+            local_target = "whatsapp"
+        elif "telegram" in text_lower:
+            intent = "local_action"
+            local_action_type = "open_telegram"
+            local_target = "telegram"
+        elif "instagram" in text_lower:
+            intent = "local_action"
+            local_action_type = "open_instagram"
+            local_target = "instagram"
+        elif any(app in text_lower for app in ["open ", "launch ", "start "]):
+            app_match = re.search(r'(?:open|launch|start)\s+(\w+)', text, re.IGNORECASE)
+            if app_match:
+                intent = "local_action"
+                local_action_type = "open_app"
+                local_target = app_match.group(1).lower()
+        elif "organize" in text_lower and ("folder" in text_lower or "files" in text_lower):
+            intent = "local_action"
+            local_action_type = "organize_files"
+            local_target = "downloads"
+            
         # Extract email recipient
         email_match = re.search(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
         if email_match:
@@ -190,7 +254,14 @@ async def command(body: dict):
             "presentation_topic": presentation_topic or text,
             "slides_count": slides_count,
             "email_recipient": email_recipient,
-            "email_instruction": email_instruction
+            "email_instruction": email_instruction,
+            "local_action_type": local_action_type,
+            "local_target": local_target,
+            "local_rules": local_rules,
+            "local_message": "",
+            "local_phone": "",
+            "local_username": "",
+            "local_question": ""
         }
 
     try:
@@ -208,12 +279,50 @@ async def command(body: dict):
     PRICE_URL = os.environ.get("PRICE_SERVICE_URL", "http://jarvis_price_compare:8002")
     PRESENTATION_URL = os.environ.get("PRESENTATION_SERVICE_URL", "http://jarvis_presentation:8001")
     EMAIL_URL = os.environ.get("EMAIL_SERVICE_URL", "http://jarvis_email:8003")
+    LOCAL_AGENT_URL = os.environ.get("LOCAL_AGENT_URL", "http://host.docker.internal:8004")
     
     price_results = None
     presentation_results = None
     email_draft_results = None
+    local_action_results = None
     
     async with httpx.AsyncClient() as client:
+        # 1. Handle Local Action intent
+        if intent == "local_action":
+            action_type = intent_data.get("local_action_type", "open_app")
+            target = intent_data.get("local_target", "")
+            rules = intent_data.get("local_rules") or []
+            message = intent_data.get("local_message", "") or ""
+            phone = intent_data.get("local_phone", "") or ""
+            username = intent_data.get("local_username", "") or ""
+            question = intent_data.get("local_question", "") or text
+            steps.append(f"Triggering local action: '{action_type}' for '{target}'.")
+            try:
+                local_resp = await client.post(
+                    f"{LOCAL_AGENT_URL}/execute", 
+                    json={
+                        "action": action_type,
+                        "target": target,
+                        "rules": rules,
+                        "message": message,
+                        "phone": phone,
+                        "username": username,
+                        "question": question
+                    }, 
+                    timeout=30.0
+                )
+                if local_resp.status_code == 200:
+                    local_action_results = local_resp.json()
+                    # If there's a Gemini Vision answer, surface it as chat_response too
+                    if local_action_results.get("answer"):
+                        response_payload["chat_response"] = local_action_results["answer"]
+                    response_payload["local_action"] = local_action_results
+                    steps.append(f"Local agent success: {local_action_results.get('message')}")
+                else:
+                    steps.append(f"Local agent returned error: {local_resp.text}")
+            except Exception as e:
+                steps.append(f"Failed to reach local agent (is it running on host port 8004?): {str(e)}")
+                
         # 2. Handle Price Compare intent
         if intent in ["price_compare", "price_compare_and_email"]:
             price_query = intent_data.get("price_query") or text

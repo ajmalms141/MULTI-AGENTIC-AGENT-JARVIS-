@@ -1040,8 +1040,14 @@ function App() {
             {/* AI GENERAL RESPONSE TAB */}
             {results && activeTab === 'general' && (
               <div style={{ lineHeight: 1.6, fontSize: '15px' }}>
-                <div className="glass-panel" style={{ padding: '24px', whiteSpace: 'pre-wrap', borderRadius: '4px' }}>
-                  {results.chat_response || "No conversational response returned. Try asking a general question like 'What is Quantum Computing?'"}
+                {results.local_action && (
+                  <div className="glass-panel animate-slide-in" style={{ padding: '24px', marginBottom: '16px', borderRadius: '4px', borderLeftColor: 'var(--primary)' }}>
+                    <h3 className="tech-mono" style={{ color: 'var(--primary)', marginBottom: '8px' }}>Local System Action Executed</h3>
+                    <p style={{ margin: 0 }}>{results.local_action.message}</p>
+                  </div>
+                )}
+                <div className="glass-panel animate-slide-in" style={{ padding: '24px', whiteSpace: 'pre-wrap', borderRadius: '4px' }}>
+                  {results.chat_response || (results.local_action ? "Action completed successfully." : "No conversational response returned. Try asking a general question like 'What is Quantum Computing?'")}
                 </div>
               </div>
             )}
